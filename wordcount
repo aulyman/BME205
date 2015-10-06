@@ -1,0 +1,120 @@
+#!/usr/bin/env python2.7
+"""
+Audrey Lyman
+BME205 Project 1: Scaffolding
+
+Description:
+    Program takes in standard text file and prints out the number of times
+    each word in the file was repeated (counted) as a 2-column standard
+    text file, in an order determined in the command line arguments.
+
+INPUTS: order (--ascend, --descend, --alpha)
+        standard text file to be processed
+        desired name of resulting output file
+
+OUTPUTS: standard text file with 2 tab separated columns: word & count
+         standard error file, if any errors
+
+Ordering notes:
+    --ascend lists the words in order of ascending counts (small -> large)
+    --descend lists the words in order of descending counts (large->small)
+    --alpha lists the words in alphabetical order, regardless of counts
+    *combinations of: alpha+descend = reverse alphabetical order
+                      alpha+ascend = alphabetical order
+    **ties in count number automatically sort alphabetically
+"""
+
+from __future__ import print_function, division
+import sys, os, argparse, collections, re
+from string import punctuation
+from collections import Counter
+
+def main(args):
+    """
+    Calls functions to: 1) parse command line arguments, 2) read stdin
+    text, and 3) print each word and its count to stdout in the order
+    specified in the command line arguments.
+    """
+    #parse through the command line
+    options = parse_arguments(args)
+    #counts['word']: # of times the word occurs in stdin 
+    counts = Counter()
+    for word in read_word(sys.stdin):
+        counts.update([word])
+    
+    print_output(sys.stdout, counts, options)
+
+def parse_arguments(arguments):
+    """
+    Parses through command line arguments to determine desired output
+    order, stdin file to be processed, and name of standard output file
+    to write results to.
+    """
+    #parsing object
+    parse = argparse.ArgumentParser(prog='wordcount', description=__doc__)
+    
+    #set possible ordering options as booleans (True if selected)
+    #make sure ascend/descend are not called together
+    group = parse.add_mutually_exclusive_group()
+    group.add_argument("--ascend", action='store_true',
+                       help='ascending counts')
+    group.add_argument("--descend", action='store_true',
+                       help='descending counts')
+    parse.add_argument("--alpha", action='store_true',
+                       help='alphabetical')
+    
+    #set input (read), output/error (write) standard text files
+    parse.add_argument("infile", nargs='?', type=argparse.FileType('r'),
+                       default=sys.stdin)
+    parse.add_argument("outfile", nargs='?', type=argparse.FileType('w'),
+                       default=sys.stdout)
+    
+    #collect list of arguments from command line
+    return parse.parse_args()
+
+def read_word(file=sys.stdin):
+    """
+    Split each line by non-alpha characters (except ') and yield each word
+    in the line, excluding all punctuation/numbers/white-space (except ')
+    Help for splitting out numbers from:
+        stackoverflow.com/questions/3340081/product-code-looks-like-
+        abcd2343-what-to-split-by-letters-and-numbers
+    """
+    for line in file:
+        #split the line into 
+        words = re.findall(r"[abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ']+", line)
+        for word in words:
+            yield word
+
+def print_output(out_file, counts, parsed_args):
+    '''
+    Sorts the word-count dict for the output from list of command line
+    argument booleans, prints each word-count pair to stdout file into 2
+    columns. Sorting algorithms assisted by forum:
+    stackoverflow.com/questions/9919342/sorting-a-dictionary-by-value-then-key
+    '''
+    #sort according to the commands
+    if parsed_args.__getattribute__('alpha'): #sort alphabetically first
+        if parsed_args.__getattribute__('descend'): #reverse alphabetical
+            sorted_counts = [count[0] for count in sorted(counts.items(),
+                    key=lambda(word, count): (word, count), reverse=True)]
+        else: #normal alphabetical
+            sorted_counts = [count[0] for count in sorted(counts.items(),
+                        key=lambda(word, count): (word, count))]
+    
+    else: #sort by counts first (alphabetical for ties)
+        if parsed_args.__getattribute__('ascend'): #low -> high count
+            sorted_counts = [count[0] for count in sorted(counts.items(),
+                            key=lambda(word, count): (count, word))]
+    
+        elif parsed_args.__getattribute__('descend'): #high -> low count
+            sorted_counts = [count[0] for count in sorted(counts.items(),
+                            key=lambda(word, count): (-count, word))]
+    
+    #print sorted list of words and corresponding dict count to stdout
+    for word in sorted_counts:
+        print('{0}\t{1}'.format(word, counts[word]), file=sys.stdout)
+    
+#run the main function (program)
+if __name__ == "__main__" :
+    sys.exit(main(sys.argv))
